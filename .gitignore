@@ -1,0 +1,4 @@
+/build/kotlin/compileKotlin/*
+/.gradle/*
+/.idea/*
+/build/*
