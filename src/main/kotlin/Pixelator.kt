@@ -63,7 +63,8 @@ object Pixelator {
         bav /= pixelSizeSquared
         for (sy in y until yBound) {
             for (sx in x until xBound) {
-                pixeled!![sy][sx] = getFlatColor(rav, gav, bav, flattenAmount)
+//                pixeled!![sy][sx] = getFlatColor(rav, gav, bav, flattenAmount)
+                pixeled!![sy][sx] = Color(rav, gav, bav)
             }
         }
     }

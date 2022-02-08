@@ -2,10 +2,9 @@
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.Button
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
+import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -45,7 +44,7 @@ object PaperProperties {
 
 @Composable
 @Preview
-fun App(windowScope: FrameWindowScope) {
+fun app(windowScope: FrameWindowScope) {
     var txtAppStatus by rememberSaveable { mutableStateOf("") }
     var imageFilePath by rememberSaveable { mutableStateOf("") }
     var originBufferedImage by rememberSaveable { mutableStateOf(BufferedImage(100, 100, BufferedImage.TYPE_INT_ARGB)) }
@@ -54,6 +53,8 @@ fun App(windowScope: FrameWindowScope) {
     }
     var pixelatedBufferedImage by rememberSaveable { mutableStateOf(Utils.convertArrToImage(Array(1) { Array(1) { Color.BLACK } })) }
     var btnPrintEnabled by rememberSaveable { mutableStateOf(false) }
+    var colorReductionComboIndex by rememberSaveable { mutableStateOf(0) }
+    val colorReductionComboItems = listOf("Origin", "10", "8", "5", "3", "2")
     val scope = rememberCoroutineScope()
 
     MaterialTheme {
@@ -63,53 +64,43 @@ fun App(windowScope: FrameWindowScope) {
             Spacer(Modifier.padding(5.dp))
             Text("Image file path is $imageFilePath")
             Spacer(Modifier.padding(5.dp))
-            Row {
-                Button(onClick = {
-                    val dialog = FileDialog(windowScope.window, "Select Image file", FileDialog.LOAD)
-                    dialog.isVisible = true
-                    imageFilePath = dialog.directory + dialog.file
+            Button(onClick = {
+                val dialog = FileDialog(windowScope.window, "Select Image file", FileDialog.LOAD)
+                dialog.isVisible = true
+                imageFilePath = dialog.directory + dialog.file
 
-                    val imageFile = File(imageFilePath)
-                    val bufferedImage = ImageIO.read(imageFile)
-                    originBufferedImage = bufferedImage
+                val imageFile = File(imageFilePath)
+                val bufferedImage = ImageIO.read(imageFile)
+                originBufferedImage = bufferedImage
 
-                    // width, height 가 A4 크기 넘지 않도록 조절  adjust the width and height so that they don't exceed A4
-                    var resizeWidth = originBufferedImage.width
-                    var resizeHeight = originBufferedImage.height
+                // width, height 가 A4 크기 넘지 않도록 조절  adjust the width and height so that they don't exceed A4
+                var resizeWidth = originBufferedImage.width
+                var resizeHeight = originBufferedImage.height
 
-                    while (PaperProperties.A4.width < resizeWidth) {
-                        resizeWidth = resizeWidth * 9 / 10
-                        resizeHeight = resizeHeight * 9 / 10
-                    }
-
-                    while (PaperProperties.A4.height < resizeHeight) {
-                        resizeWidth = resizeWidth * 9 / 10
-                        resizeHeight = resizeHeight * 9 / 10
-                    }
-
-                    resizedBufferedImage =
-                        Utils.resizeImage(originBufferedImage, resizeWidth, resizeHeight)
-
-                }) {
-                    Text("Select Image File")
+                while (PaperProperties.A4.width < resizeWidth) {
+                    resizeWidth = resizeWidth * 9 / 10
+                    resizeHeight = resizeHeight * 9 / 10
                 }
+
+                while (PaperProperties.A4.height < resizeHeight) {
+                    resizeWidth = resizeWidth * 9 / 10
+                    resizeHeight = resizeHeight * 9 / 10
+                }
+
+                resizedBufferedImage =
+                    Utils.resizeImage(originBufferedImage, resizeWidth, resizeHeight)
+
+            }) {
+                Text("Select Image File")
             }
             Spacer(Modifier.padding(5.dp))
             Row {
-                Column { DrawImageView(resizedBufferedImage) }
+                Column { drawImageView(resizedBufferedImage) }
                 Spacer(Modifier.padding(5.dp))
                 Button(onClick = {
                     val imageArr = Utils.convertImageToArr(resizedBufferedImage)
                     val pixelated = Pixelator.pixelate(imageArr, 8, 16)
-
-                    // Do color map 0 - 255 rgb value  is original   divid by 10, range conver to 0 - 25
-                    // If original value is 128, will be  128 / 10  = 12
-                    if (true) {
-                        val tempImage = Utils.convertArrToImage(pixelated)
-                        pixelatedBufferedImage = KMeans().calculate(tempImage, 20, KMeans.MODE_CONTINUOUS)
-                    } else {
-                        pixelatedBufferedImage = Utils.convertArrToImage(pixelated)
-                    }
+                    pixelatedBufferedImage = Utils.convertArrToImage(pixelated)
 
                     btnPrintEnabled = true
                 }) {
@@ -117,7 +108,23 @@ fun App(windowScope: FrameWindowScope) {
                 }
                 Spacer(Modifier.padding(5.dp))
                 Column {
-                    DrawPixelView(pixelatedBufferedImage)
+                    drawPixelView(pixelatedBufferedImage)
+                    drawColorReductionCombo(colorReductionComboItems, colorReductionComboIndex) {
+                        // Do color map 0 - 255 rgb value  is original   divid by 10, range conver to 0 - 25
+                        // If original value is 128, will be  128 / 10  = 12
+                        colorReductionComboIndex = it
+                        // get reduction value
+                        val colorRange = if (colorReductionComboIndex == 0) {
+                            255
+                        } else {
+                            colorReductionComboItems[colorReductionComboIndex].toInt()
+                        }
+
+                        val arr = Utils.convertImageToArr(resizedBufferedImage)
+                        val reductionArr = Utils.reductionArrColors(arr, colorRange)
+                        val pixelated = Pixelator.pixelate(reductionArr, 8, 16)
+                        pixelatedBufferedImage = Utils.convertArrToImage(pixelated)
+                    }
                 }
             }
             Spacer(Modifier.padding(5.dp))
@@ -151,13 +158,35 @@ fun App(windowScope: FrameWindowScope) {
 }
 
 @Composable
-fun DrawImageView(bufferedImage: BufferedImage) {
+fun drawImageView(bufferedImage: BufferedImage) {
     Image(painter = BitmapPainter(image = bufferedImage.toComposeImageBitmap()), contentDescription = "")
 }
 
 @Composable
-fun DrawPixelView(bufferedImage: BufferedImage) {
+fun drawPixelView(bufferedImage: BufferedImage) {
     Image(painter = BitmapPainter(image = bufferedImage.toComposeImageBitmap()), contentDescription = "")
+}
+
+@Composable
+fun drawColorReductionCombo(items: List<String>, selectedIndex: Int, selectedIndexChanged: (Int) -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Column(modifier = Modifier.background(MaterialTheme.colors.primaryVariant)) {
+        Text(items[selectedIndex], modifier = Modifier.fillMaxWidth().clickable { expanded = true })
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Color.DarkGray)
+        ) {
+            items.forEachIndexed { index, s ->
+                DropdownMenuItem(onClick = {
+                    selectedIndexChanged(index)
+                    expanded = false
+                }) {
+                    Text(text = s)
+                }
+            }
+        }
+    }
 }
 
 private fun printWork(image: Image, statusChanged: (PrintStatus) -> Unit) {
@@ -203,6 +232,6 @@ private fun printWork(image: Image, statusChanged: (PrintStatus) -> Unit) {
 
 fun main() = application {
     Window(onCloseRequest = ::exitApplication, title = "JewelCrossStitch") {
-        App(this)
+        app(this)
     }
 }

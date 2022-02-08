@@ -59,4 +59,46 @@ object Utils {
         }
         return img
     }
+
+    fun reductionArrColors(rgb: Array<Array<Color>>, colorRange: Int): Array<Array<Color>> {
+        val stepSize = 255 / colorRange + 1
+        val stepList = mutableListOf(0)
+
+        var i = 2
+        var nextStep = stepSize
+        while (nextStep <= 255) {
+            stepList.add(nextStep)
+            nextStep = stepSize * i++
+        }
+        stepList.add(255)
+
+        val rStepList = stepList.asReversed()
+
+        val width = rgb[0].size
+        val height = rgb.size
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val r = getRangeColor(rgb[y][x].red, rStepList)
+                val g = getRangeColor(rgb[y][x].green, rStepList)
+                val b = getRangeColor(rgb[y][x].blue, rStepList)
+                rgb[y][x] = Color(r, g, b)
+            }
+        }
+        return rgb
+    }
+
+    private fun getRangeColor(originValue: Int, rStepList: List<Int>): Int {
+        rStepList.forEach {
+            if (originValue >= it) {
+                return it
+            }
+        }
+        return 0
+    }
+
+    private fun getRangeColor(originValue: Int, range: Int): Int {
+        originValue / range
+        val first = originValue * range / 255
+        return first * 255 / range
+    }
 }
