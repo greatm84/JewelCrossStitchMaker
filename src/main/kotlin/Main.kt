@@ -68,6 +68,8 @@ fun app(windowScope: FrameWindowScope) {
     val colorReductionComboItems = listOf("Origin", "50", "20", "15", "10", "8")
     val scope = rememberCoroutineScope()
 
+    println("${Utils.getColorDistance(Color(-5384221), Color(-5384222))}")
+
     MaterialTheme {
         Column(modifier = Modifier.fillMaxSize()) {
             Text(text = "App Status", modifier = Modifier.background(MaterialTheme.colors.background))
@@ -230,19 +232,20 @@ fun DrawColorRankItem(
             painter = BitmapPainter(image = image.toComposeImageBitmap()),
             contentDescription = ""
         )
-        Text(modifier = Modifier.width(60.dp), text = colorCount.second.toString(), fontSize = 10.sp)
+        val content = "${colorCount.first.rgb}\n${colorCount.second}"
+        Text(modifier = Modifier.width(60.dp), text = content, fontSize = 8.sp)
     }
 }
 
 @Composable
 fun DrawColorReductionCombo(items: List<String>, selectedIndex: Int, selectedIndexChanged: (Int) -> Unit) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    Column(modifier = Modifier.background(MaterialTheme.colors.onSurface)) {
+    Column(modifier = Modifier.background(MaterialTheme.colors.background)) {
         Text(items[selectedIndex], modifier = Modifier.width(200.dp).clickable { expanded = true })
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colors.onSecondary)
+            modifier = Modifier.fillMaxWidth()
         ) {
             items.forEachIndexed { index, s ->
                 DropdownMenuItem(onClick = {

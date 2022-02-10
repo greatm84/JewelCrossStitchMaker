@@ -62,7 +62,7 @@ object Utils {
     fun generateReductionColorList(
         rgb: Array<Array<Color>>,
         processTakeCount: Int,
-        colorProcessCallback: ((rankCountList: List<Pair<Color, Int>>, afterCountList: List<Pair<Color, Int>>) -> Unit)? = null
+        colorProcessCallback: ((rankColorCountPairList: List<Pair<Color, Int>>, afterColorCountPairList: List<Pair<Color, Int>>) -> Unit)? = null
     ): List<Color> {
         // sort by frequently  then take bought colorCount
         val colorMap = hashMapOf<Int, Int>()   // color, count
@@ -90,10 +90,10 @@ object Utils {
             if (index == 0) return@forEachIndexed
 
             for (i in 1..sortedFreqList.size) {
-                if (i >= index) return@forEachIndexed
+                if (i >= index) break
 
                 // find non-zero prevPair
-                val prevPair = sortedFreqList[i]
+                val prevPair = sortedFreqList[index - i]
                 if (prevPair.second == 0) continue
 
                 // if current value is close to previous value   remove this key then add count to previous map key
@@ -146,7 +146,7 @@ object Utils {
         return colorDistList.minByOrNull { it.second }!!.first
     }
 
-    private fun getColorDistance(color1: Color, color2: Color): Double {
+    fun getColorDistance(color1: Color, color2: Color): Double {
         val rmean = ((color1.red + color2.red) / 2).toDouble()
         val r = color1.red - color2.red
         val g = color1.green - color2.green
