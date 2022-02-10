@@ -1,8 +1,7 @@
 import java.awt.Color
 import java.awt.image.BufferedImage
-import java.io.File
-import java.io.IOException
-import javax.imageio.ImageIO
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 
 object Utils {
@@ -16,42 +15,42 @@ object Utils {
         return outputImage
     }
 
-    fun getImage(filename: String): Array<Array<Color>>? {
-        try {
-            val img = ImageIO.read(File(filename))
-            return convertImageToArr(img)
-        } catch (e: IOException) {
-            println(e)
-        }
-        return null
-    }
-
-    fun saveImage(rgb: Array<Array<Color>>, filename: String) {
-        val img = convertArrToImage(rgb)
-        try {
-            val outputFile = File(filename)
-            ImageIO.write(img, filename.substring(filename.length - 3), outputFile)
-        } catch (e: IOException) {
-            println(e)
-        }
-    }
+//    fun getImage(filename: String): Array<Array<Color>>? {
+//        try {
+//            val img = ImageIO.read(File(filename))
+//            return convertImageToArr(img)
+//        } catch (e: IOException) {
+//            println(e)
+//        }
+//        return null
+//    }
+//
+//    fun saveImage(rgb: Array<Array<Color>>, filename: String) {
+//        val img = convertArrToImage(rgb)
+//        try {
+//            val outputFile = File(filename)
+//            ImageIO.write(img, filename.substring(filename.length - 3), outputFile)
+//        } catch (e: IOException) {
+//            println(e)
+//        }
+//    }
 
     fun convertImageToArr(img: BufferedImage): Array<Array<Color>> {
         val width = img.width
         val height = img.height
-        val rgb: Array<Array<Color>> = Array(height) { Array(width) { Color.BLACK } }
+        val rgb: Array<Array<Color>> = Array(height) { Array(width) { Color(0, 0, 0, 0) } }
         for (y in 0 until height) {
             for (x in 0 until width) {
-                rgb[y][x] = Color(img.getRGB(x, y))
+                rgb[y][x] = Color(img.getRGB(x, y), true)
             }
         }
         return rgb
     }
 
-    fun convertArrToImage(rgb: Array<Array<Color>>): BufferedImage {
+    fun convertArrToImage(rgb: Array<Array<Color>>, imageType: Int): BufferedImage {
         val width = rgb[0].size
         val height = rgb.size
-        val img = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
+        val img = BufferedImage(width, height, imageType)
         for (y in 0 until height) {
             for (x in 0 until width) {
                 img.setRGB(x, y, rgb[y][x].rgb)
@@ -60,45 +59,111 @@ object Utils {
         return img
     }
 
-    fun reductionArrColors(rgb: Array<Array<Color>>, colorRange: Int): Array<Array<Color>> {
-        val stepSize = 255 / colorRange + 1
-        val stepList = mutableListOf(0)
-
-        var i = 2
-        var nextStep = stepSize
-        while (nextStep <= 255) {
-            stepList.add(nextStep)
-            nextStep = stepSize * i++
-        }
-        stepList.add(255)
-
-        val rStepList = stepList.asReversed()
-
+    fun generateReductionColorList(
+        rgb: Array<Array<Color>>,
+        processTakeCount: Int,
+        colorProcessCallback: ((rankCountList: List<Pair<Color, Int>>, afterCountList: List<Pair<Color, Int>>) -> Unit)? = null
+    ): List<Color> {
+        // sort by frequently  then take bought colorCount
+        val colorMap = hashMapOf<Int, Int>()   // color, count
         val width = rgb[0].size
         val height = rgb.size
         for (y in 0 until height) {
             for (x in 0 until width) {
-                val r = getRangeColor(rgb[y][x].red, rStepList)
-                val g = getRangeColor(rgb[y][x].green, rStepList)
-                val b = getRangeColor(rgb[y][x].blue, rStepList)
-                rgb[y][x] = Color(r, g, b)
+                val key = rgb[y][x].rgb
+                val prevCount = colorMap.getOrPut(key) { 0 }
+                colorMap[key] = prevCount + 1
             }
         }
+
+        val threshCount = 150
+
+        // prefix flow  if list item has close value with front, second images, so that merge them and increment count
+        val std = colorMap.toList().map { it.second }.std()
+        val distThreshold = (std / threshCount)
+        println("std is $std distThresh $distThreshold")
+
+        val sortedFreqList = colorMap.toList().sortedByDescending { it.second }.take(threshCount).toMutableList()
+
+        // don't look only above cell   loop all above
+        sortedFreqList.forEachIndexed { index, pair ->
+            if (index == 0) return@forEachIndexed
+
+            for (i in 1..sortedFreqList.size) {
+                if (i >= index) return@forEachIndexed
+
+                // find non-zero prevPair
+                val prevPair = sortedFreqList[i]
+                if (prevPair.second == 0) continue
+
+                // if current value is close to previous value   remove this key then add count to previous map key
+                val colorDistance = getColorDistance(Color(prevPair.first), Color(pair.first))
+                if (colorDistance < distThreshold) {
+                    colorMap[prevPair.first] = colorMap[prevPair.first]!! + colorMap[pair.first]!!
+                    colorMap[pair.first] = 0
+                }
+            }
+        }
+
+        val remainColorPairList = colorMap.toList().sortedByDescending { it.second }
+
+        colorProcessCallback?.invoke(
+            sortedFreqList.map { Color(it.first) to it.second }.take(processTakeCount),
+            remainColorPairList.map { Color(it.first) to it.second }.take(processTakeCount)
+        )
+
+        return remainColorPairList.map { Color(it.first) }
+    }
+
+    fun reductionArrColors(
+        rgb: Array<Array<Color>>,
+        colorList: List<Color>,
+        colorCount: Int
+    ): Array<Array<Color>> {
+        val useColorList = colorList.take(colorCount)
+
+        println("useColorList count ${useColorList.size}")
+
+        val width = rgb[0].size
+        val height = rgb.size
+
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                rgb[y][x] = getInsteadColor(rgb[y][x], useColorList)
+            }
+        }
+
         return rgb
     }
 
-    private fun getRangeColor(originValue: Int, rStepList: List<Int>): Int {
-        rStepList.forEach {
-            if (originValue >= it) {
-                return it
-            }
+    private fun getInsteadColor(src: Color, colorList: List<Color>): Color {
+        val colorDistList = mutableListOf<Pair<Color, Double>>()
+
+        colorList.forEach {
+            colorDistList.add(it to getColorDistance(src, it))
         }
-        return 0
+
+        return colorDistList.minByOrNull { it.second }!!.first
     }
 
-    private fun getRangeColor(originValue: Int, range: Int): Int {
-        originValue / range
-        val first = originValue * range / 255
-        return first * 255 / range
+    private fun getColorDistance(color1: Color, color2: Color): Double {
+        val rmean = ((color1.red + color2.red) / 2).toDouble()
+        val r = color1.red - color2.red
+        val g = color1.green - color2.green
+        val b = color1.blue - color2.blue
+        val weightR = 2 + rmean / 256
+        val weightG = 4.0
+        val weightB = 2 + (255 - rmean) / 256
+        return sqrt(weightR * r * r + weightG * g * g + weightB * b * b)
     }
+}
+
+fun IntArray.std(): Double {
+    val std = this.fold(0.0) { a, b -> a + (b - this.average()).pow(2) }
+    return sqrt(std / 10)
+}
+
+fun List<Int>.std(): Double {
+    val std = this.fold(0.0) { a, b -> a + (b - this.average()).pow(2) }
+    return sqrt(std / 10)
 }

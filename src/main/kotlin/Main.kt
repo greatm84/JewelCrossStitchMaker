@@ -4,6 +4,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -11,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -51,10 +54,18 @@ fun app(windowScope: FrameWindowScope) {
     var resizedBufferedImage by rememberSaveable {
         mutableStateOf(BufferedImage(100, 100, BufferedImage.TYPE_INT_ARGB))
     }
-    var pixelatedBufferedImage by rememberSaveable { mutableStateOf(Utils.convertArrToImage(Array(1) { Array(1) { Color.BLACK } })) }
+    var pixelatedBufferedImage by rememberSaveable {
+        mutableStateOf(
+            Utils.convertArrToImage(Array(1) { Array(1) { Color(0, 0, 0, 0) } }, BufferedImage.TYPE_INT_ARGB)
+        )
+    }
+    var colorCountRankList by rememberSaveable { mutableStateOf(emptyList<Pair<Color, Int>>()) }
+    var afterCountRankList by rememberSaveable { mutableStateOf(emptyList<Pair<Color, Int>>()) }
+    var reductionColorList by rememberSaveable { mutableStateOf(emptyList<Color>()) }
+
     var btnPrintEnabled by rememberSaveable { mutableStateOf(false) }
     var colorReductionComboIndex by rememberSaveable { mutableStateOf(0) }
-    val colorReductionComboItems = listOf("Origin", "10", "8", "5", "3", "2")
+    val colorReductionComboItems = listOf("Origin", "50", "20", "15", "10", "8")
     val scope = rememberCoroutineScope()
 
     MaterialTheme {
@@ -67,6 +78,9 @@ fun app(windowScope: FrameWindowScope) {
             Button(onClick = {
                 val dialog = FileDialog(windowScope.window, "Select Image file", FileDialog.LOAD)
                 dialog.isVisible = true
+
+                if (dialog.directory == null || dialog.file == null) return@Button
+
                 imageFilePath = dialog.directory + dialog.file
 
                 val imageFile = File(imageFilePath)
@@ -95,35 +109,55 @@ fun app(windowScope: FrameWindowScope) {
             }
             Spacer(Modifier.padding(5.dp))
             Row {
-                Column { drawImageView(resizedBufferedImage) }
+                Column(Modifier.weight(1f)) { DrawImageView(resizedBufferedImage) }
                 Spacer(Modifier.padding(5.dp))
-                Button(onClick = {
-                    val imageArr = Utils.convertImageToArr(resizedBufferedImage)
-                    val pixelated = Pixelator.pixelate(imageArr, 8, 16)
-                    pixelatedBufferedImage = Utils.convertArrToImage(pixelated)
+                Column(Modifier.weight(0.4f)) {
+                    Button(modifier = Modifier.fillMaxWidth(), onClick = {
+                        val imageArr = Utils.convertImageToArr(resizedBufferedImage)
+                        val pixelated = Pixelator.pixelate(imageArr, 8, 16)
+                        pixelatedBufferedImage = Utils.convertArrToImage(pixelated, resizedBufferedImage.type)
 
-                    btnPrintEnabled = true
-                }) {
-                    Text(">>")
+                        reductionColorList =
+                            Utils.generateReductionColorList(pixelated, 10) { rankCountList, afterCountList ->
+                                colorCountRankList = rankCountList
+                                afterCountRankList = afterCountList
+                            }
+
+                        btnPrintEnabled = true
+                    }) {
+                        Text(">>")
+                    }
                 }
                 Spacer(Modifier.padding(5.dp))
-                Column {
-                    drawPixelView(pixelatedBufferedImage)
-                    drawColorReductionCombo(colorReductionComboItems, colorReductionComboIndex) {
-                        // Do color map 0 - 255 rgb value  is original   divid by 10, range conver to 0 - 25
-                        // If original value is 128, will be  128 / 10  = 12
-                        colorReductionComboIndex = it
-                        // get reduction value
-                        val colorRange = if (colorReductionComboIndex == 0) {
-                            255
-                        } else {
-                            colorReductionComboItems[colorReductionComboIndex].toInt()
+                Column(Modifier.weight(1f)) {
+                    DrawPixelView(pixelatedBufferedImage)
+                }
+                Spacer(Modifier.padding(5.dp))
+                Row(Modifier.weight(1f)) {
+                    Column(Modifier.fillMaxWidth()) {
+                        Row(Modifier.fillMaxWidth()) {
+                            // Top rank colors
+                            DrawColorRankList(colorCountRankList)
+                            Spacer(Modifier.padding(5.dp))
+                            // After rank colors
+                            DrawColorRankList(afterCountRankList)
                         }
+                        DrawColorReductionCombo(colorReductionComboItems, colorReductionComboIndex) {
+                            // Do color map 0 - 255 rgb value  is original   divid by 10, range conver to 0 - 25
+                            // If original value is 128, will be  128 / 10  = 12
+                            colorReductionComboIndex = it
+                            // get reduction value
+                            val colorRange = if (colorReductionComboIndex == 0) {
+                                255
+                            } else {
+                                colorReductionComboItems[colorReductionComboIndex].toInt()
+                            }
 
-                        val arr = Utils.convertImageToArr(resizedBufferedImage)
-                        val reductionArr = Utils.reductionArrColors(arr, colorRange)
-                        val pixelated = Pixelator.pixelate(reductionArr, 8, 16)
-                        pixelatedBufferedImage = Utils.convertArrToImage(pixelated)
+                            val arr = Utils.convertImageToArr(resizedBufferedImage)
+                            val pixelated = Pixelator.pixelate(arr, 8, 16)
+                            val reductionArr = Utils.reductionArrColors(pixelated, reductionColorList, colorRange)
+                            pixelatedBufferedImage = Utils.convertArrToImage(reductionArr, resizedBufferedImage.type)
+                        }
                     }
                 }
             }
@@ -158,24 +192,57 @@ fun app(windowScope: FrameWindowScope) {
 }
 
 @Composable
-fun drawImageView(bufferedImage: BufferedImage) {
-    Image(painter = BitmapPainter(image = bufferedImage.toComposeImageBitmap()), contentDescription = "")
+fun DrawImageView(bufferedImage: BufferedImage) {
+    Image(
+        painter = BitmapPainter(image = bufferedImage.toComposeImageBitmap()),
+        contentDescription = ""
+    )
 }
 
 @Composable
-fun drawPixelView(bufferedImage: BufferedImage) {
-    Image(painter = BitmapPainter(image = bufferedImage.toComposeImageBitmap()), contentDescription = "")
+fun DrawPixelView(bufferedImage: BufferedImage) {
+    Image(
+        painter = BitmapPainter(image = bufferedImage.toComposeImageBitmap()),
+        contentDescription = ""
+    )
 }
 
 @Composable
-fun drawColorReductionCombo(items: List<String>, selectedIndex: Int, selectedIndexChanged: (Int) -> Unit) {
+fun DrawColorRankList(
+    colorCountPairList: List<Pair<Color, Int>>
+) {
+    LazyColumn(Modifier.width(90.dp)) {
+        items(items = colorCountPairList) {
+            DrawColorRankItem(modifier = Modifier.fillMaxWidth().heightIn(20.dp, 50.dp), it)
+        }
+    }
+}
+
+@Composable
+fun DrawColorRankItem(
+    modifier: Modifier,
+    colorCount: Pair<Color, Int>
+) {
+    val image = Utils.convertArrToImage(Array(50) { Array(50) { colorCount.first } }, BufferedImage.TYPE_INT_ARGB)
+    Row(modifier = modifier) {
+        Image(
+            modifier = Modifier.width(30.dp),
+            painter = BitmapPainter(image = image.toComposeImageBitmap()),
+            contentDescription = ""
+        )
+        Text(modifier = Modifier.width(60.dp), text = colorCount.second.toString(), fontSize = 10.sp)
+    }
+}
+
+@Composable
+fun DrawColorReductionCombo(items: List<String>, selectedIndex: Int, selectedIndexChanged: (Int) -> Unit) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    Column(modifier = Modifier.background(MaterialTheme.colors.primaryVariant)) {
-        Text(items[selectedIndex], modifier = Modifier.fillMaxWidth().clickable { expanded = true })
+    Column(modifier = Modifier.background(MaterialTheme.colors.onSurface)) {
+        Text(items[selectedIndex], modifier = Modifier.width(200.dp).clickable { expanded = true })
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Color.DarkGray)
+            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colors.onSecondary)
         ) {
             items.forEachIndexed { index, s ->
                 DropdownMenuItem(onClick = {
