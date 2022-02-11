@@ -1,5 +1,7 @@
 import java.awt.Color
+import java.awt.Font
 import java.awt.image.BufferedImage
+import java.awt.image.ColorModel
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -83,33 +85,40 @@ object Utils {
         val distThreshold = (std / threshCount)
         println("std is $std distThresh $distThreshold")
 
-        val sortedFreqList = colorMap.toList().sortedByDescending { it.second }.take(threshCount).toMutableList()
+        val sortedFreqList = colorMap.toList().sortedByDescending { it.second }
 
         // don't look only above cell   loop all above
         sortedFreqList.forEachIndexed { index, pair ->
-            if (index == 0) return@forEachIndexed
+            val key = pair.first
+            val count = colorMap[pair.first]
+            if (count == 0) {
+                return@forEachIndexed
+            }
+            if (index == sortedFreqList.size - 1) {
+                return@forEachIndexed
+            }
 
-            for (i in 1..sortedFreqList.size) {
-                if (i >= index) break
+            for (i in index + 1 until sortedFreqList.size) {
 
                 // find non-zero prevPair
-                val prevPair = sortedFreqList[index - i]
-                if (prevPair.second == 0) continue
+                val nextKey = sortedFreqList[i].first
+                val nextCount = colorMap[nextKey]
+                if (nextCount == 0) continue
 
                 // if current value is close to previous value   remove this key then add count to previous map key
-                val colorDistance = getColorDistance(Color(prevPair.first), Color(pair.first))
+                val colorDistance = getColorDistance(Color(nextKey), Color(key))
                 if (colorDistance < distThreshold) {
-                    colorMap[prevPair.first] = colorMap[prevPair.first]!! + colorMap[pair.first]!!
-                    colorMap[pair.first] = 0
+                    colorMap[key] = count!! + nextCount!!
+                    colorMap[nextKey] = 0
                 }
             }
         }
 
-        val remainColorPairList = colorMap.toList().sortedByDescending { it.second }
+        val remainColorPairList = colorMap.toList().filter { it.second > 0 }.sortedByDescending { it.second }
 
         colorProcessCallback?.invoke(
-            sortedFreqList.map { Color(it.first) to it.second }.take(processTakeCount),
-            remainColorPairList.map { Color(it.first) to it.second }.take(processTakeCount)
+            sortedFreqList.take(processTakeCount).map { Color(it.first) to it.second },
+            remainColorPairList.take(processTakeCount).map { Color(it.first) to it.second }
         )
 
         return remainColorPairList.map { Color(it.first) }
@@ -156,7 +165,47 @@ object Utils {
         val weightB = 2 + (255 - rmean) / 256
         return sqrt(weightR * r * r + weightG * g * g + weightB * b * b)
     }
+
+    fun deepCopy(bi: BufferedImage): BufferedImage {
+        val cm: ColorModel = bi.colorModel
+        val isAlphaPremultiplied: Boolean = cm.isAlphaPremultiplied()
+        val raster = bi.copyData(null)
+        return BufferedImage(cm, raster, isAlphaPremultiplied, null)
+    }
+
+    fun generateColorLabelToImage(bi: BufferedImage, colorRankList: List<Int>): BufferedImage {
+        val labelList = mutableListOf<Char>()
+        labelList.addAll(('A'..'Z'))
+        labelList.addAll(('a'..'z'))
+        val colorLabelList = mutableListOf<Pair<Int, String>>()
+        colorRankList.take(labelList.size).forEachIndexed { index, color ->
+            colorLabelList.add(color to labelList[index].toString())
+        }
+        val colorMap = colorLabelList.toMap()
+
+        val newImage = deepCopy(bi)
+        val font = Font("Arial", Font.PLAIN, 7)
+
+        val g = newImage.graphics
+        g.font = font
+
+        val width = bi.width
+        val height = bi.height
+        for (y in 0 until height step 8) {
+            for (x in 0 until width step 8) {
+                val label = colorMap[bi.getRGB(x, y)] ?: continue
+                // TODO get color is wrong
+                g.color = Color.WHITE
+                g.drawString(label, x - 1, y - 1)
+                g.color = Color.BLACK
+                g.drawString(label, x - 2, y - 2)
+            }
+        }
+
+        return newImage
+    }
 }
+
 
 fun IntArray.std(): Double {
     val std = this.fold(0.0) { a, b -> a + (b - this.average()).pow(2) }

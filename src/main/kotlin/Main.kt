@@ -45,6 +45,10 @@ object PaperProperties {
     val A4 = PaperProperty(292, 204, 578, 825)
 }
 
+private fun printDistance(color1: Int, color2: Int) {
+    println("color1 $color1 - color2 $color2 dist is = ${Utils.getColorDistance(Color(color1), Color(color2))}")
+}
+
 @Composable
 @Preview
 fun app(windowScope: FrameWindowScope) {
@@ -59,16 +63,19 @@ fun app(windowScope: FrameWindowScope) {
             Utils.convertArrToImage(Array(1) { Array(1) { Color(0, 0, 0, 0) } }, BufferedImage.TYPE_INT_ARGB)
         )
     }
+
     var colorCountRankList by rememberSaveable { mutableStateOf(emptyList<Pair<Color, Int>>()) }
     var afterCountRankList by rememberSaveable { mutableStateOf(emptyList<Pair<Color, Int>>()) }
     var reductionColorList by rememberSaveable { mutableStateOf(emptyList<Color>()) }
 
+    var colorLabelEnabled by rememberSaveable { mutableStateOf(false) }
     var btnPrintEnabled by rememberSaveable { mutableStateOf(false) }
     var colorReductionComboIndex by rememberSaveable { mutableStateOf(0) }
     val colorReductionComboItems = listOf("Origin", "50", "20", "15", "10", "8")
     val scope = rememberCoroutineScope()
 
-    println("${Utils.getColorDistance(Color(-5384221), Color(-5384222))}")
+    printDistance(-15000546, -11842741)
+    printDistance(-12632257, -11842741)
 
     MaterialTheme {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -115,6 +122,7 @@ fun app(windowScope: FrameWindowScope) {
                 Spacer(Modifier.padding(5.dp))
                 Column(Modifier.weight(0.4f)) {
                     Button(modifier = Modifier.fillMaxWidth(), onClick = {
+                        colorLabelEnabled = false  // turn off color label
                         val imageArr = Utils.convertImageToArr(resizedBufferedImage)
                         val pixelated = Pixelator.pixelate(imageArr, 8, 16)
                         pixelatedBufferedImage = Utils.convertArrToImage(pixelated, resizedBufferedImage.type)
@@ -132,7 +140,7 @@ fun app(windowScope: FrameWindowScope) {
                 }
                 Spacer(Modifier.padding(5.dp))
                 Column(Modifier.weight(1f)) {
-                    DrawPixelView(pixelatedBufferedImage)
+                    DrawPixelView(pixelatedBufferedImage, colorLabelEnabled, reductionColorList)
                 }
                 Spacer(Modifier.padding(5.dp))
                 Row(Modifier.weight(1f)) {
@@ -160,13 +168,19 @@ fun app(windowScope: FrameWindowScope) {
                             val reductionArr = Utils.reductionArrColors(pixelated, reductionColorList, colorRange)
                             pixelatedBufferedImage = Utils.convertArrToImage(reductionArr, resizedBufferedImage.type)
                         }
+                        DrawCheckBox(colorLabelEnabled) { colorLabelEnabled = it }
                     }
                 }
             }
             Spacer(Modifier.padding(5.dp))
             Button(onClick = {
                 scope.launch(Dispatchers.IO) {
-                    printWork(pixelatedBufferedImage) {
+                    val targetImage = if (colorLabelEnabled) {
+                        Utils.generateColorLabelToImage(pixelatedBufferedImage, reductionColorList.map { it.rgb })
+                    } else {
+                        pixelatedBufferedImage
+                    }
+                    printWork(targetImage) {
                         when (it) {
                             PrintStatus.NONE -> {
                                 btnPrintEnabled = true
@@ -202,11 +216,19 @@ fun DrawImageView(bufferedImage: BufferedImage) {
 }
 
 @Composable
-fun DrawPixelView(bufferedImage: BufferedImage) {
-    Image(
-        painter = BitmapPainter(image = bufferedImage.toComposeImageBitmap()),
-        contentDescription = ""
-    )
+fun DrawPixelView(bufferedImage: BufferedImage, colorLabelEnabled: Boolean, colorList: List<Color>) {
+    if (colorLabelEnabled) {
+        val newImage = Utils.generateColorLabelToImage(bufferedImage, colorList.map { it.rgb })
+        Image(
+            painter = BitmapPainter(image = newImage.toComposeImageBitmap()),
+            contentDescription = ""
+        )
+    } else {
+        Image(
+            painter = BitmapPainter(image = bufferedImage.toComposeImageBitmap()),
+            contentDescription = ""
+        )
+    }
 }
 
 @Composable
@@ -256,6 +278,15 @@ fun DrawColorReductionCombo(items: List<String>, selectedIndex: Int, selectedInd
                 }
             }
         }
+    }
+}
+
+@Composable
+fun DrawCheckBox(checked: Boolean, onCheckChanged: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth()) {
+        Checkbox(checked = checked, onCheckedChange = onCheckChanged)
+        Spacer(Modifier.padding(5.dp))
+        Text(text = "Draw Color Label")
     }
 }
 
