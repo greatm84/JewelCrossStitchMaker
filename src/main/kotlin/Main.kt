@@ -66,12 +66,31 @@ fun app(windowScope: FrameWindowScope) {
 
     var colorCountRankList by rememberSaveable { mutableStateOf(emptyList<Pair<Color, Int>>()) }
     var afterCountRankList by rememberSaveable { mutableStateOf(emptyList<Pair<Color, Int>>()) }
+    var colorMap by rememberSaveable { mutableStateOf(hashMapOf<Int, Int>()) }
     var reductionColorList by rememberSaveable { mutableStateOf(emptyList<Color>()) }
 
     var colorLabelEnabled by rememberSaveable { mutableStateOf(false) }
     var btnPrintEnabled by rememberSaveable { mutableStateOf(false) }
     var colorReductionComboIndex by rememberSaveable { mutableStateOf(0) }
-    val colorReductionComboItems = listOf("Origin", "50", "20", "15", "10", "8")
+    val colorReductionComboItems =
+        listOf(
+            "500",
+            "450",
+            "400",
+            "350",
+            "300",
+            "250",
+            "225",
+            "200",
+            "175",
+            "150",
+            "125",
+            "100",
+            "50",
+            "25",
+            "15",
+            "5"
+        )
     val scope = rememberCoroutineScope()
 
     printDistance(-16251626, -16382959)
@@ -126,9 +145,13 @@ fun app(windowScope: FrameWindowScope) {
                         val imageArr = Utils.convertImageToArr(resizedBufferedImage)
                         val pixelated = Pixelator.pixelate(imageArr, 8, 16)
                         pixelatedBufferedImage = Utils.convertArrToImage(pixelated, resizedBufferedImage.type)
+                        colorMap = Utils.generateColorMap(pixelated)
 
                         reductionColorList =
-                            Utils.generateReductionColorList(pixelated, 10) { rankCountList, afterCountList ->
+                            Utils.generateReductionColorList(
+                                colorMap,
+                                colorReductionComboItems[colorReductionComboIndex].toInt()
+                            ) { rankCountList, afterCountList ->
                                 colorCountRankList = rankCountList
                                 afterCountRankList = afterCountList
                             }
@@ -146,26 +169,31 @@ fun app(windowScope: FrameWindowScope) {
                 Row(Modifier.weight(1f)) {
                     Column(Modifier.fillMaxWidth()) {
                         Row(Modifier.fillMaxWidth()) {
+                            val displayRankCount = 10
                             // Top rank colors
-                            DrawColorRankList(colorCountRankList)
+                            DrawColorRankList(colorCountRankList, displayRankCount)
                             Spacer(Modifier.padding(5.dp))
                             // After rank colors
-                            DrawColorRankList(afterCountRankList)
+                            DrawColorRankList(afterCountRankList, displayRankCount)
                         }
                         DrawColorReductionCombo(colorReductionComboItems, colorReductionComboIndex) {
                             // Do color map 0 - 255 rgb value  is original   divid by 10, range conver to 0 - 25
                             // If original value is 128, will be  128 / 10  = 12
                             colorReductionComboIndex = it
                             // get reduction value
-                            val colorRange = if (colorReductionComboIndex == 0) {
-                                255
-                            } else {
-                                colorReductionComboItems[colorReductionComboIndex].toInt()
-                            }
+                            val threshCount = colorReductionComboItems[colorReductionComboIndex].toInt()
 
                             val arr = Utils.convertImageToArr(resizedBufferedImage)
                             val pixelated = Pixelator.pixelate(arr, 8, 16)
-                            val reductionArr = Utils.reductionArrColors(pixelated, reductionColorList, colorRange)
+                            reductionColorList =
+                                Utils.generateReductionColorList(
+                                    colorMap,
+                                    threshCount
+                                ) { rankCountList, afterCountList ->
+                                    colorCountRankList = rankCountList
+                                    afterCountRankList = afterCountList
+                                }
+                            val reductionArr = Utils.reductionArrColors(pixelated, reductionColorList)
                             pixelatedBufferedImage = Utils.convertArrToImage(reductionArr, resizedBufferedImage.type)
                         }
                         DrawCheckBox(colorLabelEnabled) { colorLabelEnabled = it }
@@ -233,11 +261,15 @@ fun DrawPixelView(bufferedImage: BufferedImage, colorLabelEnabled: Boolean, colo
 
 @Composable
 fun DrawColorRankList(
-    colorCountPairList: List<Pair<Color, Int>>
+    colorCountPairList: List<Pair<Color, Int>>,
+    displaySize: Int
 ) {
-    LazyColumn(Modifier.width(90.dp)) {
-        items(items = colorCountPairList) {
-            DrawColorRankItem(modifier = Modifier.fillMaxWidth().heightIn(20.dp, 50.dp), it)
+    Column(Modifier.width(90.dp)) {
+        Text("${colorCountPairList.size}")
+        LazyColumn(Modifier.fillMaxWidth()) {
+            items(items = colorCountPairList.take(displaySize)) {
+                DrawColorRankItem(modifier = Modifier.fillMaxWidth().heightIn(20.dp, 50.dp), it)
+            }
         }
     }
 }
@@ -263,7 +295,7 @@ fun DrawColorRankItem(
 fun DrawColorReductionCombo(items: List<String>, selectedIndex: Int, selectedIndexChanged: (Int) -> Unit) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     Column(modifier = Modifier.background(MaterialTheme.colors.background)) {
-        Text(items[selectedIndex], modifier = Modifier.width(200.dp).clickable { expanded = true })
+        Text(text = "thresh ${items[selectedIndex]}", modifier = Modifier.width(200.dp).clickable { expanded = true })
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },

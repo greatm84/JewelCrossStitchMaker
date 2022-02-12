@@ -61,12 +61,7 @@ object Utils {
         return img
     }
 
-    fun generateReductionColorList(
-        rgb: Array<Array<Color>>,
-        processTakeCount: Int,
-        colorProcessCallback: ((rankColorCountPairList: List<Pair<Color, Int>>, afterColorCountPairList: List<Pair<Color, Int>>) -> Unit)? = null
-    ): List<Color> {
-        // sort by frequently  then take bought colorCount
+    fun generateColorMap(rgb: Array<Array<Color>>): HashMap<Int, Int> {
         val colorMap = hashMapOf<Int, Int>()   // color, count
         val width = rgb[0].size
         val height = rgb.size
@@ -77,8 +72,15 @@ object Utils {
                 colorMap[key] = prevCount + 1
             }
         }
+        return colorMap
+    }
 
-        val threshCount = 200
+    fun generateReductionColorList(
+        srcColorMap: HashMap<Int, Int>,
+        threshCount: Int,
+        colorProcessCallback: ((rankColorCountPairList: List<Pair<Color, Int>>, afterColorCountPairList: List<Pair<Color, Int>>) -> Unit)? = null
+    ): List<Color> {
+        val colorMap = srcColorMap.toMutableMap()
 
         // prefix flow  if list item has close value with front, second images, so that merge them and increment count
         val std = colorMap.toList().map { it.second }.std()
@@ -117,8 +119,8 @@ object Utils {
         val remainColorPairList = colorMap.toList().filter { it.second > 0 }.sortedByDescending { it.second }
 
         colorProcessCallback?.invoke(
-            sortedFreqList.take(processTakeCount).map { Color(it.first) to it.second },
-            remainColorPairList.take(processTakeCount).map { Color(it.first) to it.second }
+            sortedFreqList.map { Color(it.first) to it.second },
+            remainColorPairList.map { Color(it.first) to it.second }
         )
 
         return remainColorPairList.map { Color(it.first) }
@@ -126,11 +128,8 @@ object Utils {
 
     fun reductionArrColors(
         rgb: Array<Array<Color>>,
-        colorList: List<Color>,
-        colorCount: Int
+        useColorList: List<Color>,
     ): Array<Array<Color>> {
-        val useColorList = colorList.take(colorCount)
-
         println("useColorList count ${useColorList.size}")
 
         val width = rgb[0].size
@@ -206,7 +205,6 @@ object Utils {
         return newImage
     }
 }
-
 
 fun IntArray.std(): Double {
     val std = this.fold(0.0) { a, b -> a + (b - this.average()).pow(2) }
