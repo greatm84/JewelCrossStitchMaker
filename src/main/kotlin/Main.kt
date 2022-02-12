@@ -132,13 +132,17 @@ fun app(windowScope: FrameWindowScope) {
                         // prefix flow  if list item has close value with front, second images, so that merge them and increment count
                         val std = colorMap.toList().map { it.second }.std()
 
-                        val thresholdList = mutableListOf<Double>()
+                        val thresholdList =
+                            mutableListOf<Double>(10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0)
 
-                        var nextThreshold = std / 100
-                        for (i in 0..10) {
-                            thresholdList.add(nextThreshold)
-                            nextThreshold -= nextThreshold / 10
-                        }
+//                        var nextThreshold = std / 50
+//                        val offset = nextThreshold / 10
+//
+//
+//                        for (i in 0 until 10) {
+//                            thresholdList.add(nextThreshold)
+//                            nextThreshold -= offset
+//                        }
 
                         colorReductionComboItems = thresholdList.asReversed()
                         colorReductionComboIndex = 0
@@ -179,6 +183,7 @@ fun app(windowScope: FrameWindowScope) {
                             colorReductionComboIndex = it
                             // get reduction value
                             val threshDist = colorReductionComboItems[colorReductionComboIndex]
+                            println("threshDist $threshDist")
 
                             val arr = Utils.convertImageToArr(resizedBufferedImage)
                             val pixelated = Pixelator.pixelate(arr, 8, 16)
