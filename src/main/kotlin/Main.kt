@@ -74,8 +74,8 @@ fun app(windowScope: FrameWindowScope) {
     val colorReductionComboItems = listOf("Origin", "50", "20", "15", "10", "8")
     val scope = rememberCoroutineScope()
 
-    printDistance(-15000546, -11842741)
-    printDistance(-12632257, -11842741)
+    printDistance(-16251626, -16382959)
+    printDistance(-16448498, -16645368)
 
     MaterialTheme {
         Column(modifier = Modifier.fillMaxSize()) {

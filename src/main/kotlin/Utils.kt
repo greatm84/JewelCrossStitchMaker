@@ -78,7 +78,7 @@ object Utils {
             }
         }
 
-        val threshCount = 150
+        val threshCount = 200
 
         // prefix flow  if list item has close value with front, second images, so that merge them and increment count
         val std = colorMap.toList().map { it.second }.std()
@@ -191,14 +191,15 @@ object Utils {
 
         val width = bi.width
         val height = bi.height
+        val yOffset = 8
         for (y in 0 until height step 8) {
             for (x in 0 until width step 8) {
                 val label = colorMap[bi.getRGB(x, y)] ?: continue
                 // TODO get color is wrong
                 g.color = Color.WHITE
-                g.drawString(label, x - 1, y - 1)
+                g.drawString(label, x + 1, y + yOffset)
                 g.color = Color.BLACK
-                g.drawString(label, x - 2, y - 2)
+                g.drawString(label, x, y - 1 + yOffset)
             }
         }
 
