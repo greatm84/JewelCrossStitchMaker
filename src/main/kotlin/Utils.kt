@@ -77,15 +77,10 @@ object Utils {
 
     fun generateReductionColorList(
         srcColorMap: HashMap<Int, Int>,
-        threshCount: Int,
+        distThreshold:Double,
         colorProcessCallback: ((rankColorCountPairList: List<Pair<Color, Int>>, afterColorCountPairList: List<Pair<Color, Int>>) -> Unit)? = null
     ): List<Color> {
         val colorMap = srcColorMap.toMutableMap()
-
-        // prefix flow  if list item has close value with front, second images, so that merge them and increment count
-        val std = colorMap.toList().map { it.second }.std()
-        val distThreshold = (std / threshCount)
-        println("std is $std distThresh $distThreshold")
 
         val sortedFreqList = colorMap.toList().sortedByDescending { it.second }
 

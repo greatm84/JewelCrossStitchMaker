@@ -72,25 +72,7 @@ fun app(windowScope: FrameWindowScope) {
     var colorLabelEnabled by rememberSaveable { mutableStateOf(false) }
     var btnPrintEnabled by rememberSaveable { mutableStateOf(false) }
     var colorReductionComboIndex by rememberSaveable { mutableStateOf(0) }
-    val colorReductionComboItems =
-        listOf(
-            "500",
-            "450",
-            "400",
-            "350",
-            "300",
-            "250",
-            "225",
-            "200",
-            "175",
-            "150",
-            "125",
-            "100",
-            "50",
-            "25",
-            "15",
-            "5"
-        )
+    var colorReductionComboItems by rememberSaveable { mutableStateOf(listOf(.0)) }
     val scope = rememberCoroutineScope()
 
     printDistance(-16251626, -16382959)
@@ -147,10 +129,25 @@ fun app(windowScope: FrameWindowScope) {
                         pixelatedBufferedImage = Utils.convertArrToImage(pixelated, resizedBufferedImage.type)
                         colorMap = Utils.generateColorMap(pixelated)
 
+                        // prefix flow  if list item has close value with front, second images, so that merge them and increment count
+                        val std = colorMap.toList().map { it.second }.std()
+
+                        val thresholdList = mutableListOf<Double>()
+
+                        var nextThreshold = std / 100
+                        for (i in 0..10) {
+                            thresholdList.add(nextThreshold)
+                            nextThreshold -= nextThreshold / 10
+                        }
+
+                        colorReductionComboItems = thresholdList.asReversed()
+                        colorReductionComboIndex = 0
+                        val distThreshold = colorReductionComboItems[colorReductionComboIndex]
+                        println("std is $std distThresh $distThreshold")
+
                         reductionColorList =
                             Utils.generateReductionColorList(
-                                colorMap,
-                                colorReductionComboItems[colorReductionComboIndex].toInt()
+                                colorMap, distThreshold
                             ) { rankCountList, afterCountList ->
                                 colorCountRankList = rankCountList
                                 afterCountRankList = afterCountList
@@ -181,14 +178,14 @@ fun app(windowScope: FrameWindowScope) {
                             // If original value is 128, will be  128 / 10  = 12
                             colorReductionComboIndex = it
                             // get reduction value
-                            val threshCount = colorReductionComboItems[colorReductionComboIndex].toInt()
+                            val threshDist = colorReductionComboItems[colorReductionComboIndex]
 
                             val arr = Utils.convertImageToArr(resizedBufferedImage)
                             val pixelated = Pixelator.pixelate(arr, 8, 16)
                             reductionColorList =
                                 Utils.generateReductionColorList(
                                     colorMap,
-                                    threshCount
+                                    threshDist
                                 ) { rankCountList, afterCountList ->
                                     colorCountRankList = rankCountList
                                     afterCountRankList = afterCountList
@@ -292,7 +289,7 @@ fun DrawColorRankItem(
 }
 
 @Composable
-fun DrawColorReductionCombo(items: List<String>, selectedIndex: Int, selectedIndexChanged: (Int) -> Unit) {
+fun DrawColorReductionCombo(items: List<Double>, selectedIndex: Int, selectedIndexChanged: (Int) -> Unit) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     Column(modifier = Modifier.background(MaterialTheme.colors.background)) {
         Text(text = "thresh ${items[selectedIndex]}", modifier = Modifier.width(200.dp).clickable { expanded = true })
@@ -306,7 +303,7 @@ fun DrawColorReductionCombo(items: List<String>, selectedIndex: Int, selectedInd
                     selectedIndexChanged(index)
                     expanded = false
                 }) {
-                    Text(text = s)
+                    Text(text = s.toString())
                 }
             }
         }
