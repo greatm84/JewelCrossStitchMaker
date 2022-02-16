@@ -72,7 +72,7 @@ fun app(windowScope: FrameWindowScope) {
     var colorLabelEnabled by rememberSaveable { mutableStateOf(false) }
     var btnPrintEnabled by rememberSaveable { mutableStateOf(false) }
     var colorReductionComboIndex by rememberSaveable { mutableStateOf(0) }
-    var colorReductionComboItems by rememberSaveable { mutableStateOf(listOf(.0)) }
+    val colorReductionItems = (200 downTo 10 step 10).toList()
     val scope = rememberCoroutineScope()
 
     printDistance(-16251626, -16382959)
@@ -132,30 +132,17 @@ fun app(windowScope: FrameWindowScope) {
                         // prefix flow  if list item has close value with front, second images, so that merge them and increment count
                         val std = colorMap.toList().map { it.second }.std()
 
-                        val thresholdList =
-                            mutableListOf<Double>(10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0)
-
-//                        var nextThreshold = std / 50
-//                        val offset = nextThreshold / 10
-//
-//
-//                        for (i in 0 until 10) {
-//                            thresholdList.add(nextThreshold)
-//                            nextThreshold -= offset
-//                        }
-
-                        colorReductionComboItems = thresholdList.asReversed()
                         colorReductionComboIndex = 0
-                        val distThreshold = colorReductionComboItems[colorReductionComboIndex]
-                        println("std is $std distThresh $distThreshold")
+                        val colorDistanceThreshold = colorReductionItems[colorReductionComboIndex]
+                        println("std is $std distThresh $colorDistanceThreshold")
 
-                        reductionColorList =
-                            Utils.generateReductionColorList(
-                                colorMap, distThreshold
-                            ) { rankCountList, afterCountList ->
-                                colorCountRankList = rankCountList
-                                afterCountRankList = afterCountList
-                            }
+                        reductionColorList = Utils.generateReductionColorList(
+                            colorMap,
+                            colorDistanceThreshold
+                        ) { rankCountList, afterCountList ->
+                            colorCountRankList = rankCountList
+                            afterCountRankList = afterCountList
+                        }
 
                         btnPrintEnabled = true
                     }) {
@@ -177,12 +164,12 @@ fun app(windowScope: FrameWindowScope) {
                             // After rank colors
                             DrawColorRankList(afterCountRankList, displayRankCount)
                         }
-                        DrawColorReductionCombo(colorReductionComboItems, colorReductionComboIndex) {
+                        DrawColorReductionCombo(colorReductionItems, colorReductionComboIndex) {
                             // Do color map 0 - 255 rgb value  is original   divid by 10, range conver to 0 - 25
                             // If original value is 128, will be  128 / 10  = 12
                             colorReductionComboIndex = it
                             // get reduction value
-                            val threshDist = colorReductionComboItems[colorReductionComboIndex]
+                            val threshDist = colorReductionItems[colorReductionComboIndex]
                             println("threshDist $threshDist")
 
                             val arr = Utils.convertImageToArr(resizedBufferedImage)
@@ -294,7 +281,7 @@ fun DrawColorRankItem(
 }
 
 @Composable
-fun DrawColorReductionCombo(items: List<Double>, selectedIndex: Int, selectedIndexChanged: (Int) -> Unit) {
+fun DrawColorReductionCombo(items: List<Int>, selectedIndex: Int, selectedIndexChanged: (Int) -> Unit) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     Column(modifier = Modifier.background(MaterialTheme.colors.background)) {
         Text(text = "thresh ${items[selectedIndex]}", modifier = Modifier.width(200.dp).clickable { expanded = true })

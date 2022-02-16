@@ -77,7 +77,7 @@ object Utils {
 
     fun generateReductionColorList(
         srcColorMap: HashMap<Int, Int>,
-        distThreshold:Double,
+        distThreshold: Int,
         colorProcessCallback: ((rankColorCountPairList: List<Pair<Color, Int>>, afterColorCountPairList: List<Pair<Color, Int>>) -> Unit)? = null
     ): List<Color> {
         val colorMap = srcColorMap.toMutableMap()
